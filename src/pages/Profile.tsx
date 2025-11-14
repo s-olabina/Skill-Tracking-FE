@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../services/api';
-import { User, Mail, Bell, BellOff } from 'lucide-react';
+import { User, Mail, Bell, BellOff, Send } from 'lucide-react';
 
 const Profile: React.FC = () => {
   const { user, updateUser } = useAuth();
@@ -13,6 +13,13 @@ const Profile: React.FC = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
+
+  // Test Email state
+  const [testEmailLoading, setTestEmailLoading] = useState(false);
+  const [testEmailMessage, setTestEmailMessage] = useState<{ type: 'success' | 'error' | ''; text: string }>({
+    type: '',
+    text: '',
+  });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -41,6 +48,50 @@ const Profile: React.FC = () => {
     }
   };
 
+  // Test Email Handler
+  const handleSendTestEmail = async () => {
+    if (!formData.email) {
+      setTestEmailMessage({ type: 'error', text: 'Email address is required' });
+      return;
+    }
+
+    setTestEmailLoading(true);
+    setTestEmailMessage({ type: '', text: '' });
+
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/Test/send-test-email?toEmail=${encodeURIComponent(formData.email)}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.ok) {
+        setTestEmailMessage({
+          type: 'success',
+          text: 'Test email sent successfully! Check your inbox (and spam folder).',
+        });
+      } else {
+        const error = await response.text();
+        setTestEmailMessage({
+          type: 'error',
+          text: error || 'Failed to send email. Check backend configuration.',
+        });
+      }
+    } catch (error) {
+      setTestEmailMessage({
+        type: 'error',
+        text: 'Failed to connect to backend. Make sure the API is running.',
+      });
+      console.error('Error sending test email:', error);
+    } finally {
+      setTestEmailLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto">
       <div className="card">
@@ -51,11 +102,10 @@ const Profile: React.FC = () => {
 
         {message && (
           <div
-            className={`mb-4 p-4 rounded-lg ${
-              message.includes('success')
+            className={`mb-4 p-4 rounded-lg ${message.includes('success')
                 ? 'bg-green-100 text-green-700'
                 : 'bg-red-100 text-red-700'
-            }`}
+              }`}
           >
             {message}
           </div>
@@ -128,7 +178,7 @@ const Profile: React.FC = () => {
 
           <div className="border-t border-gray-200 pt-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Notification Preferences</h3>
-            
+
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
               <div className="flex items-start space-x-3">
                 {formData.emailNotificationsEnabled ? (
@@ -153,6 +203,44 @@ const Profile: React.FC = () => {
                 onChange={handleChange}
                 className="h-5 w-5 text-primary-600 focus:ring-primary-500 border-gray-300 rounded cursor-pointer"
               />
+            </div>
+          </div>
+
+          {/* Test Email Section */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Test Email Configuration</h3>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start space-x-3 mb-3">
+                <Mail className="w-5 h-5 text-blue-600 mt-0.5" />
+                <div className="flex-1">
+                  <h4 className="font-medium text-blue-900">Send Test Email</h4>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Verify your email configuration by sending a test email to your address
+                  </p>
+                </div>
+              </div>
+
+              {testEmailMessage.text && (
+                <div
+                  className={`mb-3 p-3 rounded-lg text-sm ${testEmailMessage.type === 'success'
+                      ? 'bg-green-100 text-green-800 border border-green-300'
+                      : 'bg-red-100 text-red-800 border border-red-300'
+                    }`}
+                >
+                  {testEmailMessage.text}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleSendTestEmail}
+                disabled={testEmailLoading || !formData.email}
+                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <Send className="w-4 h-4" />
+                <span>{testEmailLoading ? 'Sending...' : 'Send Test Email'}</span>
+              </button>
             </div>
           </div>
 

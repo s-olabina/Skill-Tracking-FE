@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { skillsApi } from '../services/api';
 import { Skill, CreateSkillDto, SkillLevel, SkillSummary } from '../types';
-import { Plus, Edit2, Trash2, BarChart3 } from 'lucide-react';
+import { Plus, Edit2, Trash2, BarChart3, Mail, Send } from 'lucide-react';
 import SkillModal from '../components/SkillModal';
 import SkillCard from '../components/SkillCard';
 
@@ -13,6 +13,13 @@ const Dashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'category' | 'level'>('all');
   const [filterValue, setFilterValue] = useState('');
+
+  // Email Report State
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailMessage, setEmailMessage] = useState<{ type: 'success' | 'error' | ''; text: string }>({
+    type: '',
+    text: '',
+  });
 
   useEffect(() => {
     loadData();
@@ -71,6 +78,57 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // Handle Send Email Report
+  const handleSendEmailReport = async () => {
+    if (skills.length === 0) {
+      setEmailMessage({
+        type: 'error',
+        text: 'You need to have at least one skill to send a report',
+      });
+      return;
+    }
+
+    setIsSendingEmail(true);
+    setEmailMessage({ type: '', text: '' });
+
+    try {
+      const response = await fetch('http://localhost:5000/api/Skills/send-report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setEmailMessage({
+          type: 'success',
+          text: data.message || 'Skills report sent successfully! Check your email.',
+        });
+
+        // Auto-hide success message after 5 seconds
+        setTimeout(() => {
+          setEmailMessage({ type: '', text: '' });
+        }, 5000);
+      } else {
+        const errorText = await response.text();
+        setEmailMessage({
+          type: 'error',
+          text: errorText || 'Failed to send email report',
+        });
+      }
+    } catch (error) {
+      setEmailMessage({
+        type: 'error',
+        text: 'Failed to connect to server. Please try again.',
+      });
+      console.error('Error sending email report:', error);
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
   const openEditModal = (skill: Skill) => {
     setEditingSkill(skill);
     setIsModalOpen(true);
@@ -110,11 +168,58 @@ const Dashboard: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900">My Skills</h1>
-        <button onClick={() => setIsModalOpen(true)} className="btn-primary flex items-center">
-          <Plus className="w-5 h-5 mr-2" />
-          Add Skill
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={handleSendEmailReport}
+            disabled={isSendingEmail || skills.length === 0}
+            className="btn-secondary flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+            title={skills.length === 0 ? 'Add skills first to send report' : 'Send skills report to your email'}
+          >
+            {isSendingEmail ? (
+              <>
+                <Send className="w-5 h-5 mr-2 animate-pulse" />
+                Sending...
+              </>
+            ) : (
+              <>
+                <Mail className="w-5 h-5 mr-2" />
+                Email Report
+              </>
+            )}
+          </button>
+          <button onClick={() => setIsModalOpen(true)} className="btn-primary flex items-center">
+            <Plus className="w-5 h-5 mr-2" />
+            Add Skill
+          </button>
+        </div>
       </div>
+
+      {/* Email Status Message */}
+      {emailMessage.text && (
+        <div
+          className={`p-4 rounded-lg border ${emailMessage.type === 'success'
+              ? 'bg-green-50 text-green-800 border-green-200'
+              : 'bg-red-50 text-red-800 border-red-200'
+            }`}
+        >
+          <div className="flex items-start">
+            <Mail className={`w-5 h-5 mr-2 mt-0.5 ${emailMessage.type === 'success' ? 'text-green-600' : 'text-red-600'
+              }`} />
+            <div className="flex-1">
+              <p className="font-medium">
+                {emailMessage.type === 'success' ? 'Success!' : 'Error'}
+              </p>
+              <p className="text-sm mt-1">{emailMessage.text}</p>
+            </div>
+            <button
+              onClick={() => setEmailMessage({ type: '', text: '' })}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Summary Cards */}
       {summary && (
